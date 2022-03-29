@@ -37,4 +37,50 @@ contract Auction {
         ipfsHash = "";
         bidIncrement = 100;
     }
+
+    modifier authorizeOwner() {
+        require(owner == msg.sender, "UNAUTHORIZED");
+        _;
+    }
+
+    modifier unauthorizeOwner() {
+        require(owner != msg.sender, "OWNER_UNAUTHORIZED");
+        _;
+    }
+
+    modifier validateDate() {
+        require(block.number >= startBlock);
+        require(block.number <= endBlock);
+        _;
+    }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a <= b) {
+            return a;
+        }
+        return b;
+    }
+
+    function placeBid() external payable unauthorizeOwner validateDate {
+        require(auctionState == State.Running, "AUCTION_NOT_RUNNING");
+        require(msg.value >= 100, "MINIMUM_BID_IS_100_WEI");
+
+        uint256 currentBid = bids[msg.sender] + msg.value;
+        require(currentBid > highestBindingBid, "MUST_BE_HIGHEST_BID");
+
+        bids[msg.sender] = currentBid;
+
+        if (currentBid <= bids[highestBidder]) {
+            highestBindingBid = min(
+                currentBid + bidIncrement,
+                bids[highestBidder]
+            );
+        } else {
+            highestBindingBid = min(
+                currentBid,
+                bids[highestBidder] + bidIncrement
+            );
+            highestBidder = payable(msg.sender);
+        }
+    }
 }
