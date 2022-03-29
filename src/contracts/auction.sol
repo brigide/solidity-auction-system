@@ -61,6 +61,10 @@ contract Auction {
         return b;
     }
 
+    function cancelAuction() public authorizeOwner {
+        auctionState = State.Canceled;
+    }
+
     function placeBid() external payable unauthorizeOwner validateDate {
         require(auctionState == State.Running, "AUCTION_NOT_RUNNING");
         require(msg.value >= 100, "MINIMUM_BID_IS_100_WEI");
@@ -82,5 +86,33 @@ contract Auction {
             );
             highestBidder = payable(msg.sender);
         }
+    }
+
+    function finalizeAuction() public {
+        require(auctionState == State.Canceled || block.number > endBlock);
+        require(msg.sender == owner || bids[msg.sender] > 0); //owner or bidder can finalize
+
+        address payable recipient;
+        uint256 value;
+
+        if (auctionState == State.Canceled) {
+            recipient = payable(msg.sender);
+            value = bids[msg.sender];
+        } else {
+            if (msg.sender == owner) {
+                recipient = owner;
+                value = highestBindingBid;
+            } else {
+                if (msg.sender == highestBidder) {
+                    recipient = highestBidder;
+                    value = bids[highestBidder] - highestBindingBid;
+                } else {
+                    recipient = payable(msg.sender);
+                    value = bids[msg.sender];
+                }
+            }
+        }
+
+        recipient.transfer(value);
     }
 }
